@@ -11544,6 +11544,46 @@ global variables, include:
   generates the file name based on the buffer name and the extension
   based on the back-end format.
 
+  The filename should not have an extension. E.g. an
+  =EXPORT_FILE_NAME= of ~my document~ would export to
+  ~my document.pdf~ (or whatever the exporter produces).
+
+  If the exported filename should contain dots, e.g.
+  ~my document v.2~, then a (rather hackish) trick is to
+  end the filename with a dot:
+
+  #+begin_example
+  ,#+EXPORT_FILE_NAME: my document v.2.
+  #+end_example
+
+  If =EXPORT_FILE_NAME= is enclosed in backticks then the text
+  between the ticks is evaluated end the returned value
+  is used as filename.
+
+  A common use case when writing documentation is that different
+  versions of the document will be exported over time. These are
+  then distributed, e.g. via e-mail or archived.
+
+  By deriving descriptive names during export, the exchange of
+  the document is greatly simplified.
+
+  E.g. the following excerpt will create a filename that contains
+  the date of export, the document title and the document version:
+
+  #+begin_example
+  ,#+TITLE: My wonderful document
+  ,#+X-DOCUMENT-VERSION: 0.2-snapshot
+  ,#+EXPORT_FILE_NAME: `(format "%s-%s (v%s)" (org-format-time-string "%Y-%m-%d_%Hh%Mm" (org-current-time)) (org-macro--find-keyword-value  "TITLE") (org-macro--find-keyword-value  "X-DOCUMENT-VERSION"))`
+  #+end_example
+
+  The /trailing dot hack/ is very helpful when generating the
+  filename. In those cases the dot needs to be /after/ the closing
+  backtick:
+
+  #+begin_example
+  ,#+EXPORT_FILE_NAME: `(format "%s" "my document v.2")`.
+  #+end_example
+
 The =OPTIONS= keyword is a compact form.  To configure multiple
 options, use several =OPTIONS= lines.  =OPTIONS= recognizes the
 following arguments.
