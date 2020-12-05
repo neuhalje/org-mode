@@ -6147,6 +6147,14 @@ to `:default' encoding.  If it fails, return S."
 	(plist-get translations :default)
 	s)))
 
+(defconst org-export--backquote-lisp-expression-regexp
+  "^[[:space:]]*`\\(.*\\)`[[:space:]]*$"
+  "A regexp to recognize an anchored lisp-expression between backticks.
+
+Spaces before and after the backticks are ignored.
+
+The syntax of the expression is not validated.")
+
 
 
 ;;; Asynchronous Export
@@ -6390,6 +6398,16 @@ or FILE."
           (or (and (functionp post-process) (funcall post-process file))
 	      file))))))
 
+(defun org-export-output-file-name--expand-name (file-name)
+  "If the filename is surrounded by `EXPR` then EXPR is evaluated and returned.
+   Otherwise return FILE-NAME"
+  (if (string-match org-export--backquote-lisp-expression-regexp file-name)
+      (let ((expression (match-string 1 file-name)))
+	(eval (car (read-from-string expression)))
+	)
+    file-name)
+)
+
 (defun org-export-output-file-name (extension &optional subtreep pub-dir)
   "Return output file's name according to buffer specifications.
 
@@ -6400,6 +6418,16 @@ With a non-nil optional argument SUBTREEP, try to determine
 output file's name by looking for \"EXPORT_FILE_NAME\" property
 of subtree at point.
 
+If the filename (without extension) is enclosed in backticks, then
+the text between the backticks is evaluated and the result is taken
+as file name.
+
+E.g.
+
+#+EXPORT_FILE_NAME: `(format \"This is a %s\" \"test\")`
+
+will evaluate to \"This is a test\".
+
 When optional argument PUB-DIR is set, use it as the publishing
 directory.
 
@@ -6407,7 +6435,7 @@ Return file name as a string."
   (let* ((visited-file (buffer-file-name (buffer-base-buffer)))
 	 (base-name
 	  (concat
-	   (file-name-sans-extension
+	   (org-export-output-file-name--expand-name (file-name-sans-extension
 	    (or
 	     ;; Check EXPORT_FILE_NAME subtree property.
 	     (and subtreep (org-entry-get nil "EXPORT_FILE_NAME" 'selective))
@@ -6426,7 +6454,7 @@ Return file name as a string."
 	     ;; Can't determine file name on our own: ask user.
 	     (read-file-name
 	      "Output file: " pub-dir nil nil nil
-	      (lambda (n) (string= extension (file-name-extension n t))))))
+	      (lambda (n) (string= extension (file-name-extension n t)))))))
 	   extension))
 	 (output-file
 	  ;; Build file name.  Enforce EXTENSION over whatever user

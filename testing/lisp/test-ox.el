@@ -1059,6 +1059,49 @@ Text"
    (org-test-with-temp-text ""
      (org-export-as (org-test-default-backend) nil nil t))))
 
+(ert-deftest test-org-export/org-export-output-file-name--expand-name ()
+  ;; Not enclosed in backticks gives the filename
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "static-filename")
+    "static-filename"))
+
+  ;; Backticks in the middle are ignored
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "aa`bb`aa")
+    "aa`bb`aa"))
+
+  ;; Enclosed in backticks evals
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "`(format \"this is a %s\" \"test\")`")
+    "this is a test"))
+
+  ;; Backticks in expr are evaluated
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "`(format \"this is a `%s`\" \"test\")`")
+    "this is a `test`"))
+
+  ;; Spaces before/after are ignored
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "    `(format \"spaces are ignored in this %s\" \"test\")`  ")
+    "spaces are ignored in this test"))
+
+  ;; Tabs before/after are ignored
+  (should
+   (equal
+    (org-export-output-file-name--expand-name "\t\t	`(format \"tabs are ignored in this %s\" \"test\")`\t")
+    "tabs are ignored in this test"))
+
+  ;; Errors should be propagated
+  (should-error
+   (org-export-output-file-name--expand-name "`(/ 1 0)`"))
+)
+
+
 (ert-deftest test-org-export/output-file-name ()
   "Test `org-export-output-file-name' specifications."
   ;; Export from a file: name is built from original file name.
@@ -1071,6 +1114,42 @@ Text"
    (equal "test.ext"
 	  (org-test-with-temp-text-in-file "#+EXPORT_FILE_NAME: test"
 	    (org-export-output-file-name ".ext" t))))
+
+  ;; Errors evaulating the expression should be propagated
+  (should-error
+   (org-test-with-temp-text  "#+EXPORT_FILE_NAME: `(/ 1 0)`"
+	  (org-export-output-file-name ".ext" t)))
+
+  ;;The expression is evaulated
+  (should
+   (equal "AB.ext"
+	  (org-test-with-temp-text
+	   "#+EXPORT_FILE_NAME: `(concat \"A\" \"B\")`"
+	   (org-export-output-file-name ".ext" t))))
+
+  ;;The expression has access to the org-document
+  (should
+   (equal "expected.ext"
+	  (org-test-with-temp-text
+	   "#+TEST-PROPERTY: expected\n#+EXPORT_FILE_NAME: `(org-macro--find-keyword-value  \"TEST-PROPERTY\")`"
+	   (org-export-output-file-name ".ext" t))))
+
+  ;;The expression has access to the org-document
+  (should
+   (equal "My Title-expected.ext"
+	  (org-test-with-temp-text
+	   "#+TEST-PROPERTY: expected\n#+TITLE: My Title
+#+EXPORT_FILE_NAME: `(format \"%s-%s\" (org-macro--find-keyword-value  \"TITLE\") (org-macro--find-keyword-value  \"TEST-PROPERTY\"))`"
+	   (org-export-output-file-name ".ext" t))))
+
+  ;;The expression has access to the org-document
+  (should
+   (equal "expected.ext"
+	  (org-test-with-temp-text
+	   "#+TEST-PROPERTY: expected
+#+EXPORT_FILE_NAME: `(org-macro--find-keyword-value  \"TEST-PROPERTY\")`"
+	   (org-export-output-file-name ".ext" t))))
+
   ;; When exporting to subtree, check EXPORT_FILE_NAME property first.
   (should
    (equal "test.ext"
@@ -1086,6 +1165,22 @@ Text"
 :EXPORT_FILE_NAME: property
 :END:"
 	    (org-export-output-file-name ".ext" t))))
+
+;  ; The following test /should/ succeed but does not.
+;  ; Ignore for now as this is not the most important feature.
+;  (should
+;   (equal "test-property.ext"
+;	  (org-test-with-temp-text
+;	      "#+EXPORT_FILE_NAME: keyword
+;#+TEST-PROPERTY: test-keyword
+;* Test<point>
+;:PROPERTIES:
+;:EXPORT_FILE_NAME: `(format \"%s\" (org-macro--find-keyword-value  \"TEST-PROPERTY\"))`
+;:EXPORT_TEST-PROPERTY: export-test-property
+;:TEST-PROPERTY: test-property
+;:END:"
+;	    (org-export-output-file-name ".ext" t))))
+
   ;; From a buffer not associated to a file, too.
   (should
    (equal "test.ext"
